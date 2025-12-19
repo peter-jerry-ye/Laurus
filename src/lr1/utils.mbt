@@ -1,26 +1,26 @@
 ///|
-typealias Int as Index
+type Index = Int
 
 ///|
-typealias Index as StateIndex
+type StateIndex = Index
 
 ///|
-typealias Index as RuleIndex
+type RuleIndex = Index
 
 ///|
-typealias Int as RuleSize
+type RuleSize = Int
 
 ///|
-pub typealias Int as Priority
+pub type Priority = Int
 
 ///|
-typealias Int as Token
+type Token = Int
 
 ///|
-typealias Int as Sort
+type Sort = Int
 
 ///|
-pub typealias Int as Symbol
+pub type Symbol = Int
 
 ///|
 pub type Sentence = Array[Symbol]

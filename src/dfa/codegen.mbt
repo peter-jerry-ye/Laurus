@@ -117,18 +117,18 @@ fn Generator::init(self : Self) -> Unit {
     #|      let tail = self.src[cur_off + 1]
     #|      self.cur.off += 2
     #|      self.cur.col += 1
-    #|      (((lead & 0x3FF) << 10) | (tail & 0x3FF)) + 0x10000
+    #|      (((lead.to_int() & 0x3FF) << 10) | (tail.to_int() & 0x3FF)) + 0x10000
     #|    }
     #|    0xA as c => {
     #|      self.cur.off += 1
     #|      self.cur.row += 1
     #|      self.cur.col = 0
-    #|      c
+    #|      c.to_int()
     #|    }
     #|    _ as c => {
     #|      self.cur.off += 1
     #|      self.cur.col += 1
-    #|      c
+    #|      c.to_int()
     #|    }
     #|  }
     #|}

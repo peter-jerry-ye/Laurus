@@ -2,7 +2,7 @@
   "name": "Mepy/Laurus",
   "version": "0.2.0",
   "deps": {
-    "moonbitlang/x": "0.4.34",
+    "moonbitlang/x": "0.4.38",
     "Kaida-Amethyst/path": "0.1.1"
   },
   "readme": "README.mbt.md",

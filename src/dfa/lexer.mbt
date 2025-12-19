@@ -58,11 +58,11 @@ fn Lexer::next(self : Self) -> Int {
     0xD800..=0xDBFF as lead => {
       let tail = self.src[self.cur + 1]
       self.cur += 2
-      (((lead & 0x3FF) << 10) | (tail & 0x3FF)) + 0x10000
+      (((lead.to_int() & 0x3FF) << 10) | (tail.to_int() & 0x3FF)) + 0x10000
     }
     _ as c => {
       self.cur += 1
-      c
+      c.to_int()
     }
   }
 }

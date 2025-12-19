@@ -5,7 +5,7 @@ pub const LAURUS_RESERVED_EOF : String = "LAURUS_EOF"
 pub const LAURUS_RESERVED_SPACE : String = "LAURUS_SPACE"
 
 ///|
-pub typealias Char as CodePoint
+pub type CodePoint = Char
 
 ///|
 const MinCodePoint = '\u{0}'
@@ -24,7 +24,7 @@ fn CodePoint::prev(self : CodePoint) -> CodePoint {
 }
 
 ///|
-pub typealias Int as Token
+pub type Token = Int
 
 ///|
 pub(all) struct TokenSet(Set[Token]) derive(Show, Eq)
@@ -45,7 +45,7 @@ pub impl Hash for TokenSet with hash(self : TokenSet) -> Int {
 }
 
 ///|
-typealias Int as Index
+pub type Index = Int
 
 ///|
 struct Subset(Set[Index]) derive(Show, Eq)
