@@ -1,14 +1,14 @@
 ///|
-struct TyA(String) derive(Show, Eq)
+pub(all) struct TyA(String) derive(Show)
 
 ///|
-struct TyS {
+pub(all) struct TyS {
   a : TyA
   b : TyB
-} derive(Show, Eq)
+} derive(Show)
 
 ///|
-enum TyB {
+pub(all) enum TyB {
   One(String)
   Two(first~ : String, second~ : String)
-} derive(Show, Eq)
+} derive(Show)

@@ -1,5 +1,5 @@
 ///|
-enum Expr {
+pub(all) enum Expr {
   Add(Expr, Expr)
   Sub(Expr, Expr)
   Mul(Expr, Expr)

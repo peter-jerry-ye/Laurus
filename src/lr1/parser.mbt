@@ -1,7 +1,30 @@
 ///|
+pub struct Span {
+  beg : Location
+  end : Location
+  children : FixedArray[Span]
+} derive(Show)
+
+///|
+#inline
+fn Span::leaf(beg : Location, end : Location) -> Span {
+  { beg, end, children: FixedArray::default() }
+}
+
+///|
+fn Span::tree(children : FixedArray[Span]) -> Span {
+  let len = children.length()
+  // guard len != 0
+  let beg = children[0].beg
+  let end = children[len - 1].end
+  { beg, end, children }
+}
+
+///|
 struct Parser {
   lexer : Lexer
   state_stack : Array[Int]
+  span_stack : Array[Span]
   node_stack : Array[Node]
 } derive(Show)
 
@@ -10,15 +33,27 @@ pub fn Parser::new(src? : String = "") -> Self {
   {
     lexer: Lexer::new(src~),
     state_stack: Array::new(),
+    span_stack: Array::new(),
     node_stack: Array::new(),
   }
 }
 
 ///|
-pub fn Parser::init(self : Self, src : String, cur? : Int = 0) -> Unit {
+pub fn Parser::init(
+  self : Self,
+  src : String,
+  cur? : Location = Location::default(),
+) -> Unit {
   self.lexer.init(src, cur~)
   self.state_stack.clear()
   self.node_stack.clear()
+}
+
+///|
+#inline
+fn Parser::shift_span(self : Self, lexeme : Lexeme) -> Unit {
+  // no need to clone lexeme.beg/end because it is to be consumed.
+  self.span_stack.push(Span::leaf(lexeme.beg, lexeme.end))
 }
 
 ///|
@@ -37,7 +72,7 @@ enum Node {
 } derive(Show)
 
 ///|
-pub fn Parser::parse(self : Self) -> TyS? {
+pub fn Parser::parse(self : Self) -> TyS raise LexerError {
   let mut lexeme = self.lexer.scan0()
   loop 0 {
     0 => {
@@ -46,6 +81,7 @@ pub fn Parser::parse(self : Self) -> TyS? {
           A => { // shift
             let node = self.lexer.get(lexeme) |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan1()
             3
           }
@@ -56,7 +92,12 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(1)
       continue match lexeme.token {
           LAURUS_EOF => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 1:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::TyS(x0)
             let node = TyS::parseStart(x0) |> Node::TyS
             self.node_stack.push(node)
@@ -71,11 +112,13 @@ pub fn Parser::parse(self : Self) -> TyS? {
           B => { // shift
             let node = self.lexer.get(lexeme) |> String::parseB |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan2()
             5
           }
           D => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan1()
             6
           }
@@ -85,15 +128,13 @@ pub fn Parser::parse(self : Self) -> TyS? {
     3 => {
       self.enter_state(3)
       continue match lexeme.token {
-          B => { // reduce
+          B | D => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 1:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
-            guard self.node_stack.unsafe_pop() is Node::String(x0)
-            let node = TyA(x0) |> Node::TyA
-            self.node_stack.push(node)
-            2
-          }
-          D => { // reduce
-            self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::String(x0)
             let node = TyA(x0) |> Node::TyA
             self.node_stack.push(node)
@@ -106,8 +147,14 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(4)
       continue match lexeme.token {
           LAURUS_EOF => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 2:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::TyB(x1)
             guard self.node_stack.unsafe_pop() is Node::TyA(x0)
             let node = TyS::{ a: x0, b: x1 } |> Node::TyS
@@ -122,11 +169,17 @@ pub fn Parser::parse(self : Self) -> TyS? {
       continue match lexeme.token {
           C => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan3()
             15
           }
           LAURUS_EOF => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 1:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::String(x0)
             let node = TyB::One(x0) |> Node::TyB
             self.node_stack.push(node)
@@ -147,11 +200,13 @@ pub fn Parser::parse(self : Self) -> TyS? {
           B => { // shift
             let node = self.lexer.get(lexeme) |> String::parseB |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan4()
             8
           }
           D => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan1()
             9
           }
@@ -163,6 +218,7 @@ pub fn Parser::parse(self : Self) -> TyS? {
       continue match lexeme.token {
           D => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan5()
             14
           }
@@ -174,11 +230,17 @@ pub fn Parser::parse(self : Self) -> TyS? {
       continue match lexeme.token {
           C => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan3()
             12
           }
           D => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 1:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::String(x0)
             let node = TyB::One(x0) |> Node::TyB
             self.node_stack.push(node)
@@ -199,11 +261,13 @@ pub fn Parser::parse(self : Self) -> TyS? {
           B => { // shift
             let node = self.lexer.get(lexeme) |> String::parseB |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan4()
             8
           }
           D => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan1()
             9
           }
@@ -215,6 +279,7 @@ pub fn Parser::parse(self : Self) -> TyS? {
       continue match lexeme.token {
           D => { // shift
             // ignore the old lexeme
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan6()
             11
           }
@@ -225,9 +290,16 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(11)
       continue match lexeme.token {
           D => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 3:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             // ignore Node [x2 : D]
             guard self.node_stack.unsafe_pop() is Node::TyB(x1)
             // ignore Node [x0 : D]
@@ -250,6 +322,7 @@ pub fn Parser::parse(self : Self) -> TyS? {
           B => { // shift
             let node = self.lexer.get(lexeme) |> String::parseB |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan6()
             13
           }
@@ -260,9 +333,16 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(13)
       continue match lexeme.token {
           D => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 3:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::String(x2)
             // ignore Node [x1 : C]
             guard self.node_stack.unsafe_pop() is Node::String(x0)
@@ -283,9 +363,16 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(14)
       continue match lexeme.token {
           LAURUS_EOF => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 3:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             // ignore Node [x2 : D]
             guard self.node_stack.unsafe_pop() is Node::TyB(x1)
             // ignore Node [x0 : D]
@@ -308,6 +395,7 @@ pub fn Parser::parse(self : Self) -> TyS? {
           B => { // shift
             let node = self.lexer.get(lexeme) |> String::parseB |> Node::String
             self.node_stack.push(node)
+            self.shift_span(lexeme)
             lexeme = self.lexer.scan5()
             16
           }
@@ -318,9 +406,16 @@ pub fn Parser::parse(self : Self) -> TyS? {
       self.enter_state(16)
       continue match lexeme.token {
           LAURUS_EOF => { // reduce
+            let span = self.span_stack[self.span_stack.length() - 3:].iter()
+              |> FixedArray::from_iter
+              |> Span::tree
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
             self.state_stack.unsafe_pop() |> ignore
+            self.span_stack.unsafe_pop() |> ignore
+            self.span_stack.push(span)
             guard self.node_stack.unsafe_pop() is Node::String(x2)
             // ignore Node [x1 : C]
             guard self.node_stack.unsafe_pop() is Node::String(x0)
@@ -339,8 +434,6 @@ pub fn Parser::parse(self : Self) -> TyS? {
     }
     _ => break
   }
-  match self.node_stack[0] {
-    TyS(node) => Some(node)
-    _ => None
-  }
+  guard self.node_stack[0] is TyS(node)
+  node
 }
